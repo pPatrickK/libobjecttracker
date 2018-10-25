@@ -19,7 +19,7 @@
 // cloud size               : uint32
 // [x y z, x y z, ... ]     : float32
 
-#define markermax 60*4 
+#define markermax 60*4
 
 using Point = pcl::PointXYZ;
 using Cloud = pcl::PointCloud<Point>;
@@ -100,7 +100,7 @@ namespace libobjecttracker {
 		void play(libobjecttracker::ObjectTracker &tracker) const
 		{
 			for (size_t i = 0; i < clouds.size(); ++i) {
-				printf("\n  %d  ------------------------------\n", i);
+				printf("\n  %ld  ------------------------------\n", i);
 				auto dur = std::chrono::milliseconds(timestamps[i]);
 				std::chrono::high_resolution_clock::time_point stamp(dur);
 				tracker.update(stamp, clouds[i]);
@@ -136,7 +136,7 @@ namespace libobjecttracker {
 
 			//play points
 			for (size_t i = 0; i < clouds.size(); ++i) {
-				printf("\n  %d  ------------------------------\n", i);
+				printf("\n  %ld  ------------------------------\n", i);
 				auto dur = std::chrono::milliseconds(timestamps[i]);
 				std::chrono::high_resolution_clock::time_point stamp(dur);
 				tracker.update(stamp, clouds[i]);
@@ -149,7 +149,7 @@ namespace libobjecttracker {
 				int a = 0;
 				for (auto & object : objects) {
 					++a;
-					printf("Object vector size: %d\n", objects.size());
+					printf("Object vector size: %ld\n", objects.size());
 					printf("Object %d processing\n", a);
 					//debugging stuff
 					Cloud::Ptr &objMarkers = config[object.m_markerConfigurationIdx];
