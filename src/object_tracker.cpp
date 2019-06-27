@@ -8,6 +8,13 @@
 #include <pcl/registration/transformation_estimation_2D.h>
 // #include <pcl/registration/transformation_estimation_lm.h>
 
+/////// Philipp logging x,y,z,roll,pitch,yaw
+#include<iostream>
+#include<fstream>
+///////
+
+
+
 // TEMP for debug
 #include <cstdio>
 
@@ -29,6 +36,40 @@ static float deltaAngle(float a, float b)
 {
   return atan2(sin(a-b), cos(a-b));
 }
+
+
+/////// Philipp Median Filter
+#include "MedianFilter.h"
+
+bool medianFilterActive=false;
+bool logDataActive=false;
+
+MedianFilter<float,3> filter_x;
+MedianFilter<float,3> filter_y;
+MedianFilter<float,3> filter_z;
+MedianFilter<float,3> filter_roll;
+MedianFilter<float,3> filter_pitch;
+MedianFilter<float,3> filter_yaw;
+
+MedianFilter<float,3> filter_last_x;
+MedianFilter<float,3> filter_last_y;
+MedianFilter<float,3> filter_last_z;
+MedianFilter<float,3> filter_last_roll;
+MedianFilter<float,3> filter_last_pitch;
+MedianFilter<float,3> filter_last_yaw;
+
+MedianFilter<float,3> filter_vx;
+MedianFilter<float,3> filter_vy;
+MedianFilter<float,3> filter_vz;
+MedianFilter<float,3> filter_wroll;
+MedianFilter<float,3> filter_wpitch;
+MedianFilter<float,3> filter_wyaw;
+///////
+
+///////////// Philipp
+int warningCounter=0;
+int maxWarningCounter=2; // Number of warnings that will be ignored in a row, before a warning is printed
+//////////////
 
 namespace libobjecttracker {
 
@@ -272,8 +313,8 @@ void ObjectTracker::runICP(std::chrono::high_resolution_clock::time_point stamp,
     // TODO: take max here?
     const DynamicsConfiguration& dynConf = m_dynamicsConfigurations[object.m_dynamicsConfigurationIdx];
     float maxV = dynConf.maxXVelocity;
-    icp.setMaxCorrespondenceDistance(maxV * dt);
-    // ROS_INFO("max: %f", maxV * dt);
+    icp.setMaxCorrespondenceDistance(10 * maxV * dt);// icp.setMaxCorrespondenceDistance(maxV * dt); // Änderung Philipp
+    // ROS_INFO("max: %f", maxV * );
 
     // Update input source
     icp.setInputSource(m_markerConfigurations[object.m_markerConfigurationIdx]);
@@ -302,6 +343,42 @@ void ObjectTracker::runICP(std::chrono::high_resolution_clock::time_point stamp,
     float last_x, last_y, last_z, last_roll, last_pitch, last_yaw;
     pcl::getTranslationAndEulerAngles(object.m_lastTransformation, last_x, last_y, last_z, last_roll, last_pitch, last_yaw);
 
+
+    /////// Philipp Median Filter
+    if(medianFilterActive) {
+      filter_x.addSample(x);
+      filter_y.addSample(y);
+      filter_z.addSample(z);
+      filter_roll.addSample(roll);
+      filter_pitch.addSample(pitch);
+      filter_yaw.addSample(yaw);
+
+      filter_last_x.addSample(last_x);
+      filter_last_y.addSample(last_y);
+      filter_last_z.addSample(last_z);
+      filter_last_roll.addSample(last_roll);
+      filter_last_pitch.addSample(last_pitch);
+      filter_last_yaw.addSample(last_yaw);
+
+
+      if(filter_x.isReady()) {x=filter_x.getMedian();}
+      if(filter_y.isReady()) {y=filter_y.getMedian();}
+      if(filter_z.isReady()) {z=filter_z.getMedian();}
+      if(filter_roll.isReady()) {roll=filter_roll.getMedian();}
+      if(filter_pitch.isReady()) {pitch=filter_pitch.getMedian();}
+      if(filter_yaw.isReady()) {yaw=filter_yaw.getMedian();}
+
+      if(filter_last_x.isReady()) {last_x=filter_last_x.getMedian();}
+      if(filter_last_y.isReady()) {last_y=filter_last_y.getMedian();}
+      if(filter_last_z.isReady()) {last_z=filter_last_z.getMedian();}
+      if(filter_last_roll.isReady()) {last_roll=filter_last_roll.getMedian();}
+      if(filter_last_pitch.isReady()) {last_pitch=filter_last_pitch.getMedian();}
+      if(filter_last_yaw.isReady()) {last_yaw=filter_last_yaw.getMedian();}
+    }
+    ///////
+
+
+
     float vx = (x - last_x) / dt;
     float vy = (y - last_y) / dt;
     float vz = (z - last_z) / dt;
@@ -309,6 +386,36 @@ void ObjectTracker::runICP(std::chrono::high_resolution_clock::time_point stamp,
     float wpitch = deltaAngle(pitch, last_pitch) / dt;
     float wyaw = deltaAngle(yaw, last_yaw) / dt;
 
+    /////// Philipp Median Filter Velocity
+    if(medianFilterActive) {
+      filter_vx.addSample(vx);
+      filter_vy.addSample(vy);
+      filter_vz.addSample(vz);
+      filter_wroll.addSample(wroll);
+      filter_wpitch.addSample(wpitch);
+      filter_wyaw.addSample(wyaw);
+
+      if(filter_vx.isReady()) {vx=filter_vx.getMedian();}
+      if(filter_vy.isReady()) {vy=filter_vy.getMedian();}
+      if(filter_vz.isReady()) {vz=filter_vz.getMedian();}
+      if(filter_wroll.isReady()) {wroll=filter_wroll.getMedian();}
+      if(filter_wpitch.isReady()) {wpitch=filter_wpitch.getMedian();}
+      if(filter_wyaw.isReady()) {wyaw=filter_wyaw.getMedian();}
+    }
+    ///////
+
+/////// Philipp logging x,y,z,... and saving in .csv
+    std::ofstream myfile;
+    if(logDataActive){
+    	if(medianFilterActive){
+      		myfile.open("/home/flw/Dokumente/philippCrazySwarm/crazyswarm/ros_ws/src/externalDependencies/libobjecttracker/src/Logging_objectTracker_with_median_filter.csv", std::ios::out | std::ios::app);
+    	} else {
+      		myfile.open("/home/flw/Dokumente/philippCrazySwarm/crazyswarm/ros_ws/src/externalDependencies/libobjecttracker/src/Logging_objectTracker_without_median_filter.csv", std::ios::out | std::ios::app);
+    	}
+    	myfile <<x<<","<<y<<","<<z<<","<<roll<<","<<pitch<<","<<yaw<<","<<last_x<<","<<last_y<<","<<last_z<<","<<last_roll<<","<<last_pitch<<","<<last_yaw<<","<<vx<<","<<vy<<","<<vz<<","<<wroll<<","<<wpitch<<","<<wyaw<<","<<dt<<std::endl;
+    	myfile.close();
+	}
+///////
     // ROS_INFO("v: %f,%f,%f, w: %f,%f,%f, dt: %f", vx, vy, vz, wroll, wpitch, wyaw, dt);
 
     if (   fabs(vx) < dynConf.maxXVelocity
@@ -321,41 +428,47 @@ void ObjectTracker::runICP(std::chrono::high_resolution_clock::time_point stamp,
         && fabs(pitch) < dynConf.maxPitch
         && icp.getFitnessScore() < dynConf.maxFitnessScore)
     {
+      warningCounter = 0;
       object.m_velocity = (tROTA.translation() - object.center()) / dt;
       object.m_lastTransformation = tROTA;
       object.m_lastValidTransform = stamp;
       object.m_lastTransformationValid = true;
     } else {
-      std::stringstream sstr;
-      sstr << "Dynamic check failed" << std::endl;
-      if (fabs(vx) >= dynConf.maxXVelocity) {
-        sstr << "vx: " << vx << " >= " << dynConf.maxXVelocity << std::endl;
+      if(warningCounter >= maxWarningCounter) {
+        warningCounter = 0;
+        std::stringstream sstr;
+        sstr << "Dynamic check failed" << std::endl;
+        if (fabs(vx) >= dynConf.maxXVelocity) {
+          sstr << "vx: " << vx << " >= " << dynConf.maxXVelocity << std::endl;
+        }
+        if (fabs(vy) >= dynConf.maxYVelocity) {
+          sstr << "vy: " << vy << " >= " << dynConf.maxYVelocity << std::endl;
+        }
+        if (fabs(vz) >= dynConf.maxZVelocity) {
+          sstr << "vz: " << vz << " >= " << dynConf.maxZVelocity << std::endl;
+        }
+        if (fabs(wroll) >= dynConf.maxRollRate) {
+          sstr << "wroll: " << wroll << " >= " << dynConf.maxRollRate << std::endl;
+        }
+        if (fabs(wpitch) >= dynConf.maxPitchRate) {
+          sstr << "wpitch: " << wpitch << " >= " << dynConf.maxPitchRate << std::endl;
+        }
+        if (fabs(wyaw) >= dynConf.maxYawRate) {
+          sstr << "wyaw: " << wyaw << " >= " << dynConf.maxYawRate << std::endl;
+        }
+        if (fabs(roll) >= dynConf.maxRoll) {
+          sstr << "roll: " << roll << " >= " << dynConf.maxRoll << std::endl;
+        }
+        if (fabs(pitch) >= dynConf.maxPitch) {
+          sstr << "pitch: " << pitch << " >= " << dynConf.maxPitch << std::endl;
+        }
+        if (icp.getFitnessScore() >= dynConf.maxFitnessScore) {
+          sstr << "fitness: " << icp.getFitnessScore() << " >= " << dynConf.maxFitnessScore << std::endl;
+        }
+        logWarn(sstr.str());
+      } else {
+        warningCounter++;
       }
-      if (fabs(vy) >= dynConf.maxYVelocity) {
-        sstr << "vy: " << vy << " >= " << dynConf.maxYVelocity << std::endl;
-      }
-      if (fabs(vz) >= dynConf.maxZVelocity) {
-        sstr << "vz: " << vz << " >= " << dynConf.maxZVelocity << std::endl;
-      }
-      if (fabs(wroll) >= dynConf.maxRollRate) {
-        sstr << "wroll: " << wroll << " >= " << dynConf.maxRollRate << std::endl;
-      }
-      if (fabs(wpitch) >= dynConf.maxPitchRate) {
-        sstr << "wpitch: " << wpitch << " >= " << dynConf.maxPitchRate << std::endl;
-      }
-      if (fabs(wyaw) >= dynConf.maxYawRate) {
-        sstr << "wyaw: " << wyaw << " >= " << dynConf.maxYawRate << std::endl;
-      }
-      if (fabs(roll) >= dynConf.maxRoll) {
-        sstr << "roll: " << roll << " >= " << dynConf.maxRoll << std::endl;
-      }
-      if (fabs(pitch) >= dynConf.maxPitch) {
-        sstr << "pitch: " << pitch << " >= " << dynConf.maxPitch << std::endl;
-      }
-      if (icp.getFitnessScore() >= dynConf.maxFitnessScore) {
-        sstr << "fitness: " << icp.getFitnessScore() << " >= " << dynConf.maxFitnessScore << std::endl;
-      }
-      logWarn(sstr.str());
     }
   }
 
@@ -375,6 +488,20 @@ void ObjectTracker::logWarn(const std::string& msg)
 #include "cloudlog.hpp"
 int main()
 {
+  /////// Philipp logging x,y,z,roll,pitch,yaw
+  if(logDataActive) {
+    std::ofstream myfile;
+    if(medianFilterActive){
+      myfile.open("/home/flw/Dokumente/philippCrazySwarm/crazyswarm/ros_ws/src/externalDependencies/libobjecttracker/src/Logging_objectTracker_with_median_filter.csv", std::ios::out | std::ios::app);
+    } else {
+      myfile.open("/home/flw/Dokumente/philippCrazySwarm/crazyswarm/ros_ws/src/externalDependencies/libobjecttracker/src/Logging_objectTracker_without_median_filter.csv", std::ios::out | std::ios::app);
+    }
+    myfile <<"x, y, z, roll, pitch, yaw, last_x, last_y, last_z, last_roll, last_pitch, last_yaw, vx, vy, vz, wroll, wpitch, wyaw, dt"<<std::endl;
+    myfile.close();
+  }
+  ///////
+
+
   libobjecttracker::ObjectTracker ot({}, {}, {});
   PointCloudLogger logger;
   PointCloudPlayer player;
