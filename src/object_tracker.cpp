@@ -8,9 +8,26 @@
 #include <pcl/registration/transformation_estimation_2D.h>
 // #include <pcl/registration/transformation_estimation_lm.h>
 
-/////// Philipp logging x,y,z,roll,pitch,yaw
+/////// Philipp logging
 #include<iostream>
 #include<fstream>
+#include <string>
+
+// get curent path
+// #ifdef WINDOWS
+// #include <direct.h>
+// #define GetCurrentDir _getcwd
+// #else
+// #include <unistd.h>
+// #define GetCurrentDir getcwd
+// #endif
+//
+// std::string GetCurrentWorkingDir( void ) {
+//   char buff[FILENAME_MAX];
+//   GetCurrentDir( buff, FILENAME_MAX );
+//   std::string current_working_dir(buff);
+//   return current_working_dir;
+// }
 ///////
 
 
@@ -42,7 +59,7 @@ static float deltaAngle(float a, float b)
 #include "MedianFilter.h"
 
 bool medianFilterActive=false;
-bool logDataActive=false;
+bool logDataActive=true;
 
 MedianFilter<float,3> filter_x;
 MedianFilter<float,3> filter_y;
@@ -408,11 +425,11 @@ void ObjectTracker::runICP(std::chrono::high_resolution_clock::time_point stamp,
     std::ofstream myfile;
     if(logDataActive){
     	if(medianFilterActive){
-      		myfile.open("/home/flw/Dokumente/philippCrazySwarm/crazyswarm/ros_ws/src/externalDependencies/libobjecttracker/src/Logging_objectTracker_with_median_filter.csv", std::ios::out | std::ios::app);
+      		myfile.open("/home/dartagnan/Dokumente/crazyswarmPhilipp/crazyswarm/ros_ws/src/externalDependencies/libobjecttracker/src/Logging_objectTracker_with_median_filter.csv", std::ios::out | std::ios::app);
     	} else {
-      		myfile.open("/home/flw/Dokumente/philippCrazySwarm/crazyswarm/ros_ws/src/externalDependencies/libobjecttracker/src/Logging_objectTracker_without_median_filter.csv", std::ios::out | std::ios::app);
+      		myfile.open("/home/dartagnan/Dokumente/crazyswarmPhilipp/crazyswarm/ros_ws/src/externalDependencies/libobjecttracker/src/Logging_objectTracker_without_median_filter.csv", std::ios::out | std::ios::app);
     	}
-    	myfile <<x<<","<<y<<","<<z<<","<<roll<<","<<pitch<<","<<yaw<<","<<last_x<<","<<last_y<<","<<last_z<<","<<last_roll<<","<<last_pitch<<","<<last_yaw<<","<<vx<<","<<vy<<","<<vz<<","<<wroll<<","<<wpitch<<","<<wyaw<<","<<dt<<std::endl;
+    	myfile << object.m_markerConfigurationIdx <<","<<x<<","<<y<<","<<z<<","<<last_x<<","<<last_y<<","<<last_z<<","<<maxV<<","<<dt<<std::endl;
     	myfile.close();
 	}
 ///////
@@ -496,7 +513,7 @@ int main()
     } else {
       myfile.open("/home/flw/Dokumente/philippCrazySwarm/crazyswarm/ros_ws/src/externalDependencies/libobjecttracker/src/Logging_objectTracker_without_median_filter.csv", std::ios::out | std::ios::app);
     }
-    myfile <<"x, y, z, roll, pitch, yaw, last_x, last_y, last_z, last_roll, last_pitch, last_yaw, vx, vy, vz, wroll, wpitch, wyaw, dt"<<std::endl;
+    myfile <<"object, x, y, z, last_x, last_y, last_z, maxV, dt"<<std::endl;
     myfile.close();
   }
   ///////
