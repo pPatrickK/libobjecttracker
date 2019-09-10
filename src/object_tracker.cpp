@@ -56,31 +56,11 @@ static float deltaAngle(float a, float b)
 
 
 /////// Philipp Median Filter
-#include "MedianFilter.h"
+// #include "MedianFilter.h"
 
-bool medianFilterActive=false;
+bool medianFilterActive=true;
 bool logDataActive=true;
 
-MedianFilter<float,3> filter_x;
-MedianFilter<float,3> filter_y;
-MedianFilter<float,3> filter_z;
-MedianFilter<float,3> filter_roll;
-MedianFilter<float,3> filter_pitch;
-MedianFilter<float,3> filter_yaw;
-
-MedianFilter<float,3> filter_last_x;
-MedianFilter<float,3> filter_last_y;
-MedianFilter<float,3> filter_last_z;
-MedianFilter<float,3> filter_last_roll;
-MedianFilter<float,3> filter_last_pitch;
-MedianFilter<float,3> filter_last_yaw;
-
-MedianFilter<float,3> filter_vx;
-MedianFilter<float,3> filter_vy;
-MedianFilter<float,3> filter_vz;
-MedianFilter<float,3> filter_wroll;
-MedianFilter<float,3> filter_wpitch;
-MedianFilter<float,3> filter_wyaw;
 ///////
 
 ///////////// Philipp
@@ -103,6 +83,7 @@ Object::Object(
   , m_lastValidTransform()
   , m_lastTransformationValid(false)
 {
+  vMax = 1;
 }
 
 const Eigen::Affine3f& Object::transformation() const
@@ -329,8 +310,11 @@ void ObjectTracker::runICP(std::chrono::high_resolution_clock::time_point stamp,
     // Set the max correspondence distance
     // TODO: take max here?
     const DynamicsConfiguration& dynConf = m_dynamicsConfigurations[object.m_dynamicsConfigurationIdx];
-    float maxV = dynConf.maxXVelocity;
-    icp.setMaxCorrespondenceDistance(10 * maxV * dt);// icp.setMaxCorrespondenceDistance(maxV * dt); // Änderung Philipp
+    if(object.vMax*dt < 0.05){
+      icp.setMaxCorrespondenceDistance(0.05);
+    }else{
+      icp.setMaxCorrespondenceDistance(object.vMax*dt);
+    }
     // ROS_INFO("max: %f", maxV * );
 
     // Update input source
@@ -363,37 +347,22 @@ void ObjectTracker::runICP(std::chrono::high_resolution_clock::time_point stamp,
 
     /////// Philipp Median Filter
     if(medianFilterActive) {
-      filter_x.addSample(x);
-      filter_y.addSample(y);
-      filter_z.addSample(z);
-      filter_roll.addSample(roll);
-      filter_pitch.addSample(pitch);
-      filter_yaw.addSample(yaw);
-
-      filter_last_x.addSample(last_x);
-      filter_last_y.addSample(last_y);
-      filter_last_z.addSample(last_z);
-      filter_last_roll.addSample(last_roll);
-      filter_last_pitch.addSample(last_pitch);
-      filter_last_yaw.addSample(last_yaw);
+      object.filter_x.addSample(x);
+      object.filter_y.addSample(y);
+      object.filter_z.addSample(z);
+      object.filter_last_x.addSample(last_x);
+      object.filter_last_y.addSample(last_y);
+      object.filter_last_z.addSample(last_z);
 
 
-      if(filter_x.isReady()) {x=filter_x.getMedian();}
-      if(filter_y.isReady()) {y=filter_y.getMedian();}
-      if(filter_z.isReady()) {z=filter_z.getMedian();}
-      if(filter_roll.isReady()) {roll=filter_roll.getMedian();}
-      if(filter_pitch.isReady()) {pitch=filter_pitch.getMedian();}
-      if(filter_yaw.isReady()) {yaw=filter_yaw.getMedian();}
-
-      if(filter_last_x.isReady()) {last_x=filter_last_x.getMedian();}
-      if(filter_last_y.isReady()) {last_y=filter_last_y.getMedian();}
-      if(filter_last_z.isReady()) {last_z=filter_last_z.getMedian();}
-      if(filter_last_roll.isReady()) {last_roll=filter_last_roll.getMedian();}
-      if(filter_last_pitch.isReady()) {last_pitch=filter_last_pitch.getMedian();}
-      if(filter_last_yaw.isReady()) {last_yaw=filter_last_yaw.getMedian();}
+      if(object.filter_x.isReady()) {x=object.filter_x.getMedian();}
+      if(object.filter_y.isReady()) {y=object.filter_y.getMedian();}
+      if(object.filter_z.isReady()) {z=object.filter_z.getMedian();}
+      if(object.filter_last_x.isReady()) {last_x=object.filter_last_x.getMedian();}
+      if(object.filter_last_y.isReady()) {last_y=object.filter_last_y.getMedian();}
+      if(object.filter_last_z.isReady()) {last_z=object.filter_last_z.getMedian();}
     }
     ///////
-
 
 
     float vx = (x - last_x) / dt;
@@ -405,31 +374,28 @@ void ObjectTracker::runICP(std::chrono::high_resolution_clock::time_point stamp,
 
     /////// Philipp Median Filter Velocity
     if(medianFilterActive) {
-      filter_vx.addSample(vx);
-      filter_vy.addSample(vy);
-      filter_vz.addSample(vz);
-      filter_wroll.addSample(wroll);
-      filter_wpitch.addSample(wpitch);
-      filter_wyaw.addSample(wyaw);
+      object.filter_vx.addSample(vx);
+      object.filter_vy.addSample(vy);
+      object.filter_vz.addSample(vz);
 
-      if(filter_vx.isReady()) {vx=filter_vx.getMedian();}
-      if(filter_vy.isReady()) {vy=filter_vy.getMedian();}
-      if(filter_vz.isReady()) {vz=filter_vz.getMedian();}
-      if(filter_wroll.isReady()) {wroll=filter_wroll.getMedian();}
-      if(filter_wpitch.isReady()) {wpitch=filter_wpitch.getMedian();}
-      if(filter_wyaw.isReady()) {wyaw=filter_wyaw.getMedian();}
+
+      if(object.filter_vx.isReady()) {vx=object.filter_vx.getMedian();}
+      if(object.filter_vy.isReady()) {vy=object.filter_vy.getMedian();}
+      if(object.filter_vz.isReady()) {vz=object.filter_vz.getMedian();}
     }
     ///////
+
+     object.vMax = std::sqrt(std::pow(vx,2)+std::pow(vy,2)+std::pow(vz,2));
 
 /////// Philipp logging x,y,z,... and saving in .csv
     std::ofstream myfile;
     if(logDataActive){
     	if(medianFilterActive){
-      		myfile.open("/home/dartagnan/Dokumente/crazyswarmPhilipp/crazyswarm/ros_ws/src/externalDependencies/libobjecttracker/src/Logging_objectTracker_with_median_filter.csv", std::ios::out | std::ios::app);
-    	} else {
-      		myfile.open("/home/dartagnan/Dokumente/crazyswarmPhilipp/crazyswarm/ros_ws/src/externalDependencies/libobjecttracker/src/Logging_objectTracker_without_median_filter.csv", std::ios::out | std::ios::app);
-    	}
-    	myfile << object.m_markerConfigurationIdx <<","<<x<<","<<y<<","<<z<<","<<last_x<<","<<last_y<<","<<last_z<<","<<maxV<<","<<dt<<std::endl;
+        myfile.open("/home/dartagnan/Dokumente/crazyswarmPhilipp2/crazyswarm/ros_ws/src/externalDependencies/libobjecttracker/src/objTrac_MF"+std::to_string(object.m_markerConfigurationIdx)+".csv", std::ios::out | std::ios::app);
+    } else {
+        myfile.open("/home/dartagnan/Dokumente/crazyswarmPhilipp2/crazyswarm/ros_ws/src/externalDependencies/libobjecttracker/src/objTrac_no_MF"+std::to_string(object.m_markerConfigurationIdx)+".csv", std::ios::out | std::ios::app);
+    }
+    	myfile << object.m_markerConfigurationIdx <<","<<x<<","<<y<<","<<z<<","<<last_x<<","<<last_y<<","<<last_z<<","<<object.vMax<<","<<dt<<std::endl;
     	myfile.close();
 	}
 ///////
@@ -513,7 +479,7 @@ int main()
     } else {
       myfile.open("/home/flw/Dokumente/philippCrazySwarm/crazyswarm/ros_ws/src/externalDependencies/libobjecttracker/src/Logging_objectTracker_without_median_filter.csv", std::ios::out | std::ios::app);
     }
-    myfile <<"object, x, y, z, last_x, last_y, last_z, maxV, dt"<<std::endl;
+    myfile <<"object, x, y, z, last_x, last_y, last_z, vMax, dt"<<std::endl;
     myfile.close();
   }
   ///////

@@ -6,6 +6,8 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 
+#include "MedianFilter.h"
+
 namespace libobjecttracker {
 
   struct DynamicsConfiguration
@@ -51,6 +53,20 @@ namespace libobjecttracker {
     Eigen::Vector3f m_velocity;
     std::chrono::time_point<std::chrono::high_resolution_clock> m_lastValidTransform;
     bool m_lastTransformationValid;
+
+    MedianFilter<float,3> filter_x;
+    MedianFilter<float,3> filter_y;
+    MedianFilter<float,3> filter_z;
+
+    MedianFilter<float,3> filter_last_x;
+    MedianFilter<float,3> filter_last_y;
+    MedianFilter<float,3> filter_last_z;
+
+    MedianFilter<float,3> filter_vx;
+    MedianFilter<float,3> filter_vy;
+    MedianFilter<float,3> filter_vz;
+
+    float vMax;
 
     friend ObjectTracker;
     friend PointCloudDebugger;
@@ -98,5 +114,3 @@ namespace libobjecttracker {
   };
 
 } // namespace libobjecttracker
-
-
